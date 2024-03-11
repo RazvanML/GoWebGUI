@@ -17,3 +17,8 @@ func main() {
 
 }
 ```
+
+The main advantages of this approach are:
+- releases the developer of the HTTP way of thinking and focus on the business logic
+- Javascript controls can be separately developed and tested
+- Simplicity, one needs to know Go only
