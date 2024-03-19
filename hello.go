@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,16 +9,40 @@ import (
 )
 
 type control interface {
-	render() string
 	setOwner(p *page)
 	event(string)
+	getTag() string
+	getText() string
+	getAttributes() *map[string]string
 }
 
 type htmlControl struct {
-	control
-	owner     *page
-	id        string
-	callbacks map[string]func()
+	//	control
+	text       string
+	tag        string
+	attributes map[string]string
+	owner      *page
+	callbacks  map[string]func()
+}
+
+var id_counter int = 0
+
+func (h *htmlControl) setOwner(p *page) {
+	if h.owner != nil {
+		panic("Control is already owned by a page.")
+	}
+	if h.attributes == nil {
+		h.attributes = map[string]string{}
+	}
+	_, i := h.attributes["id"]
+	if !i {
+		id_counter++
+		h.attributes["id"] = fmt.Sprintf("id%d", id_counter)
+	}
+
+	var cc control = h
+	p.ids[h.attributes["id"]] = &cc
+	h.owner = p
 }
 
 func (h *htmlControl) event(ev string) {
@@ -27,6 +52,25 @@ func (h *htmlControl) event(ev string) {
 	h.callbacks[ev]()
 }
 
+func (h htmlControl) getTag() string {
+	return h.tag
+}
+
+func (h htmlControl) getText() string {
+	return h.text
+}
+
+func (h htmlControl) getAttributes() *map[string]string {
+	return &h.attributes
+}
+
+func (h *htmlControl) setAttr(name string, val string) {
+	if h.attributes == nil {
+		h.attributes = make(map[string]string)
+	}
+	h.attributes[name] = val
+}
+
 func (h *htmlControl) mapEvent(ev string, event func()) {
 	if h.callbacks == nil {
 		h.callbacks = make(map[string]func())
@@ -34,100 +78,131 @@ func (h *htmlControl) mapEvent(ev string, event func()) {
 	h.callbacks[ev] = event
 }
 
-var id_counter int = 0
-
-func (h *htmlControl) setOwner(p *page) {
-	if h.owner != nil {
-		panic("Control is already owned by a page.")
-	}
-	if h.id == "" {
-		id_counter++
-		h.id = fmt.Sprintf("id%d", id_counter)
-	}
-
-	h.owner = p
-	p.ids[h.id] = h
+type composite interface {
+	append(n *control)
+	insertAt(n *control, pos int)
 }
 
-type composite struct {
+type compositeHtml struct {
+	//	composite
 	htmlControl
-	controls []control
+	controls []*control
 }
 
-func (c *composite) append(n control) {
+func (c *compositeHtml) append(n *control) {
 	c.controls = append(c.controls, n)
-	n.setOwner(c.owner)
+	(*n).setOwner(c.owner)
+	var cc composite = c
+	c.owner.addControl(cc, nil, *n)
 }
 
-func (c *composite) render() string {
-	ret := ""
-	for _, c1 := range c.controls {
-		ret = ret + c1.render()
+func (c *compositeHtml) insertAt(n *control, pos int) {
+	if pos > len(c.controls) {
+		c.append(n)
+		return
 	}
-	return ret
+	c.controls = append(c.controls[:pos+1], c.controls[pos:]...)
+	c.controls[pos] = n
+
+	(*n).setOwner(c.owner)
 }
 
 type page struct {
-	composite
-	ids map[string]control
+	compositeHtml
+	ids    map[string]*control
+	buffer string
 }
 
-func (p *page) render() string {
-	ret := fmt.Sprintf(`
+func (p *page) addControl(parent composite, where *htmlControl, who control) {
+	var parentCtrl control = parent.(control)
+
+	attrs, _ := json.Marshal(*who.getAttributes())
+	p.buffer += fmt.Sprintf("addElement('%s',null,'%s','%s','%s');", (*parentCtrl.getAttributes())["id"],
+		who.getTag(), attrs, who.getText())
+}
+
+func (p page) render() string {
+	ret := `
 	<!DOCTYPE html>
 <html lang="en">
 
 <head>
-  <title>HTML5 Boilerplate</title>
+  <title>HTML5 Example</title>
   <script> 
+
+  function addElement(parent, before, tag, attrs, text ) {
+	var p = document.getElementById(parent)
+	var x = document.createElement(tag)
+	for ( y in Object.keys(attrs)) {
+		x[y] = attrs[y]
+	}
+	x.innerText = text
+	if (before == null) {
+	   p.append(x)	
+	} else {
+		var b2 = document.getElementById("before")
+		p.insertBefore(x,b2)
+	}
+  }
+
   function onClick(button) { 
 	  var state = new XMLHttpRequest(); 
 	  state.onload = function () { 
-		  document.getElementById("container") 
-			  .innerHTML = state.getAllResponseHeaders(); 
+		eval (
+		 state.responseText
+		 ) 
 	  } 
 	  state.open("GET", button.id+"/onclick", true); 
 	  state.send(); 
   } 
+
+  function getData() { 
+	var state = new XMLHttpRequest(); 
+	state.onload = function () { 
+	  eval (
+	   state.responseText
+	   ) 
+	} 
+//	state.open("GET", button.id+"/onclick", true); 
+	state.open("GET", "/_refresh", true); 
+	state.send(); 
+} 
+
 </script> </head>
 
-<body>
-  %s
+<body onLoad="getData()" id="body0">
 </body>
-
 </html>
-	`, p.composite.render())
+	`
 	return ret
 }
 
-func newPage() page {
-	ret := page{}
-	ret.owner = &ret
-	ret.ids = make(map[string]control)
+func newPage() *page {
+	ret := &page{}
+	ret.ids = make(map[string]*control)
+	ret.setAttr("id", "body0")
+	ret.owner = ret
 	return ret
 }
 
 type Button struct {
 	htmlControl
-	text string
 }
 
-func NewButton(text string, onclick func()) Button {
-	ret := Button{text: text}
+func NewButton(text string, onclick func()) *Button {
+	ret := &Button{htmlControl{text: text, tag: "Button"}}
 	ret.mapEvent("onclick", onclick)
 	return ret
-}
-
-func (c *Button) render() string {
-	return fmt.Sprintf("<Button onClick='onClick(this)' id='%s'>%s</Button>", c.id, c.text)
 }
 
 type app struct {
 	page
 }
 
-func newApp() app {
-	return app{newPage()}
+func newApp() *app {
+	ret := app{page: *newPage()}
+	ret.owner = &ret.page
+	return &ret
 }
 
 func (a *app) run() {
@@ -141,28 +216,44 @@ func (a *app) handler(w http.ResponseWriter, r *http.Request) {
 	if len(path) == 0 {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(a.render()))
+	} else if path == "_refresh" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte(a.buffer))
+		print("Refresh called with: " + a.buffer + "\n")
+		a.buffer = ""
 	} else {
 		for name, control := range a.page.ids {
 			if strings.HasPrefix(path, name+"/") {
 				event := path[len(name)+1:]
-				control.event(event)
+				(*control).event(event)
 			}
-
 		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte(a.buffer))
+		//		a.buffer = ""
 	}
 }
 
 func main() {
 
 	app1 := newApp()
+
+	/*
+		x := &htmlControl{}
+		c := x.(*control)
+		c.setOwner(&app1.page)
+	*/
+
 	button1 := NewButton("Button1", func() { print("Hello world 1\n") })
 	button2 := NewButton("Button2", func() {
 		b := NewButton("Button 3", nil)
-		app1.append(&b)
+		var cc control = b
+		app1.append(&cc)
 	})
 
-	app1.append(&button1)
-	app1.append(&button2)
+	var cc control = button1
+	app1.append(&cc)
+	cc = button2
+	app1.append(cc)
 	app1.run()
-
 }
