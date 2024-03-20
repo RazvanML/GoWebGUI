@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -14,18 +15,24 @@ type control interface {
 	getTag() string
 	getText() string
 	getAttributes() *map[string]string
+	getCallbacks() map[string]func(string)
 }
 
 type htmlControl struct {
-	//	control
+	control
 	text       string
 	tag        string
 	attributes map[string]string
 	owner      *page
-	callbacks  map[string]func()
+	callbacks  map[string]func(string)
+	syncProps  []string
 }
 
 var id_counter int = 0
+
+func (h *htmlControl) getCallbacks() map[string]func(string) {
+	return h.callbacks
+}
 
 func (h *htmlControl) setOwner(p *page) {
 	if h.owner != nil {
@@ -49,7 +56,7 @@ func (h *htmlControl) event(ev string) {
 	if h.callbacks == nil {
 		return
 	}
-	h.callbacks[ev]()
+	h.callbacks[ev]("")
 }
 
 func (h htmlControl) getTag() string {
@@ -71,9 +78,9 @@ func (h *htmlControl) setAttr(name string, val string) {
 	h.attributes[name] = val
 }
 
-func (h *htmlControl) mapEvent(ev string, event func()) {
+func (h *htmlControl) mapEvent(ev string, event func(string)) {
 	if h.callbacks == nil {
-		h.callbacks = make(map[string]func())
+		h.callbacks = make(map[string]func(string))
 	}
 	h.callbacks[ev] = event
 }
@@ -116,9 +123,16 @@ type page struct {
 func (p *page) addControl(parent composite, where *htmlControl, who control) {
 	var parentCtrl control = parent.(control)
 
-	attrs, _ := json.Marshal(*who.getAttributes())
-	p.buffer += fmt.Sprintf("addElement('%s',null,'%s','%s','%s');", (*parentCtrl.getAttributes())["id"],
-		who.getTag(), attrs, who.getText())
+	attrs, _ := json.Marshal(who.getAttributes())
+	ev := who.getCallbacks()
+	keys := make([]string, 0, len(ev))
+	for k, _ := range ev {
+		keys = append(keys, k)
+	}
+	events, _ := json.Marshal(keys)
+	p.buffer += fmt.Sprintf("addElement('%s',null,'%s',%s,'%s',%s);\n",
+		(*parentCtrl.getAttributes())["id"],
+		who.getTag(), attrs, who.getText(), events)
 }
 
 func (p page) render() string {
@@ -130,19 +144,61 @@ func (p page) render() string {
   <title>HTML5 Example</title>
   <script> 
 
-  function addElement(parent, before, tag, attrs, text ) {
+
+  function stringify_object(object, depth=0, max_depth=2) {
+    // change max_depth to see more levels, for a touch event, 2 is good
+    if (depth > max_depth)
+        return 'Object';
+
+    const obj = {};
+    for (let key in object) {
+        let value = object[key];
+        if (value instanceof Node)
+            // specify which properties you want to see from the node
+            value = {id: value.id};
+        else if (value instanceof Window)
+            value = 'Window';
+        else if (value instanceof Object)
+            value = stringify_object(value, depth+1, max_depth);
+
+        obj[key] = value;
+    }
+
+    return depth? obj: JSON.stringify(obj);
+}
+
+  controls = {}
+
+  function addElement(parent, before, tag, attrs, text, events ) {
 	var p = document.getElementById(parent)
 	var x = document.createElement(tag)
-	for ( y in Object.keys(attrs)) {
-		x[y] = attrs[y]
+	for ( y in attrs) {
+		x.setAttribute(y,attrs[y])
 	}
 	x.innerText = text
+
+	for (e in events) {
+		x.addEventListener(events[e], (ev)=>conveyEvent(x,events[e],ev))
+	}
 	if (before == null) {
 	   p.append(x)	
 	} else {
 		var b2 = document.getElementById("before")
 		p.insertBefore(x,b2)
 	}
+	controls[x.id] = x
+  }
+
+
+  function conveyEvent(control, eventStr, event) {
+	var state = new XMLHttpRequest(); 
+	state.onload = function () { 
+	  eval (
+	   state.responseText
+	   ) 
+	} 
+	state.open("POST", "convey/"+control.id+"/"+eventStr, true); 
+	state.send(stringify_object(event)); 
   }
 
   function onClick(button) { 
@@ -189,9 +245,11 @@ type Button struct {
 	htmlControl
 }
 
-func NewButton(text string, onclick func()) *Button {
+func NewButton(text string, onclick func(string)) *Button {
 	ret := &Button{htmlControl{text: text, tag: "Button"}}
-	ret.mapEvent("onclick", onclick)
+	if onclick != nil {
+		ret.mapEvent("click", onclick)
+	}
 	return ret
 }
 
@@ -221,16 +279,18 @@ func (a *app) handler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(a.buffer))
 		print("Refresh called with: " + a.buffer + "\n")
 		a.buffer = ""
-	} else {
-		for name, control := range a.page.ids {
-			if strings.HasPrefix(path, name+"/") {
-				event := path[len(name)+1:]
-				(*control).event(event)
-			}
-		}
+	} else if strings.HasPrefix(path, "convey/") {
+		arr := strings.Split(path, "/")
+		ctrl := *a.page.ids[arr[1]]
+		reqBody, _ := io.ReadAll(r.Body)
+		ctrl.getCallbacks()[arr[2]](string(reqBody))
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(a.buffer))
-		//		a.buffer = ""
+		print("Refresh called with: " + a.buffer + "\n")
+		a.buffer = ""
+	} else {
+		w.WriteHeader(404)
+		fmt.Fprint(w, "Cannot find: "+path)
 	}
 }
 
@@ -244,8 +304,8 @@ func main() {
 		c.setOwner(&app1.page)
 	*/
 
-	button1 := NewButton("Button1", func() { print("Hello world 1\n") })
-	button2 := NewButton("Button2", func() {
+	button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
+	button2 := NewButton("Button2", func(ss string) {
 		b := NewButton("Button 3", nil)
 		var cc control = b
 		app1.append(&cc)
@@ -254,6 +314,6 @@ func main() {
 	var cc control = button1
 	app1.append(&cc)
 	cc = button2
-	app1.append(cc)
+	app1.append(&cc)
 	app1.run()
 }
