@@ -107,11 +107,14 @@ func (c *compositeHtml) insertAt(n *control, pos int) {
 	if pos > len(c.controls) {
 		c.append(n)
 		return
+	} else {
+		c.controls = append(c.controls[:pos+1], c.controls[pos:]...)
+		c.controls[pos] = n
+		(*n).setOwner(c.owner)
+		var cc composite = c
+		c.owner.addControl(cc, c.controls[pos+1], *n)
 	}
-	c.controls = append(c.controls[:pos+1], c.controls[pos:]...)
-	c.controls[pos] = n
 
-	(*n).setOwner(c.owner)
 }
 
 type page struct {
@@ -120,18 +123,24 @@ type page struct {
 	buffer string
 }
 
-func (p *page) addControl(parent composite, where *htmlControl, who control) {
+func (p *page) addControl(parent composite, where *control, who control) {
 	var parentCtrl control = parent.(control)
 
 	attrs, _ := json.Marshal(who.getAttributes())
 	ev := who.getCallbacks()
 	keys := make([]string, 0, len(ev))
-	for k, _ := range ev {
+	for k := range ev {
 		keys = append(keys, k)
 	}
 	events, _ := json.Marshal(keys)
-	p.buffer += fmt.Sprintf("addElement('%s',null,'%s',%s,'%s',%s);\n",
-		(*parentCtrl.getAttributes())["id"],
+
+	wherestr := "null"
+	if where != nil {
+		wherestr = "'" + (*(*where).getAttributes())["id"] + "'"
+	}
+
+	p.buffer += fmt.Sprintf("addElement('%s',%s,'%s',%s,'%s',%s);\n",
+		(*parentCtrl.getAttributes())["id"], wherestr,
 		who.getTag(), attrs, who.getText(), events)
 }
 
@@ -183,7 +192,7 @@ func (p page) render() string {
 	if (before == null) {
 	   p.append(x)	
 	} else {
-		var b2 = document.getElementById("before")
+		var b2 = document.getElementById(before)
 		p.insertBefore(x,b2)
 	}
 	controls[x.id] = x
@@ -297,18 +306,11 @@ func (a *app) handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	app1 := newApp()
-
-	/*
-		x := &htmlControl{}
-		c := x.(*control)
-		c.setOwner(&app1.page)
-	*/
-
 	button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
 	button2 := NewButton("Button2", func(ss string) {
 		b := NewButton("Button 3", nil)
 		var cc control = b
-		app1.append(&cc)
+		app1.insertAt(&cc, 1)
 	})
 
 	var cc control = button1
