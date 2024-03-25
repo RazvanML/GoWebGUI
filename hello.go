@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type control interface {
@@ -119,6 +122,7 @@ func (c *compositeHtml) insertAt(n *control, pos int) {
 
 type page struct {
 	compositeHtml
+	id     string
 	ids    map[string]*control
 	buffer string
 }
@@ -242,8 +246,9 @@ func (p page) render() string {
 	return ret
 }
 
-func newPage() *page {
+func newPage(id string) *page {
 	ret := &page{}
+	ret.id = id
 	ret.ids = make(map[string]*control)
 	ret.setAttr("id", "body0")
 	ret.owner = ret
@@ -262,41 +267,80 @@ func NewButton(text string, onclick func(string)) *Button {
 	return ret
 }
 
+type TextInput struct {
+	htmlControl
+	val string
+}
+
+func NewTextInput(text string, onchange func(string)) *TextInput {
+	ret := &TextInput{htmlControl: htmlControl{text: "", tag: "input"}, val: text}
+	ret.setAttr("type", "input")
+	(*ret.getAttributes())["type"] = "input"
+	if onchange != nil {
+		ret.mapEvent("change", onchange)
+	}
+	return ret
+}
+
 type app struct {
-	page
+
+	// pattern and page. This is the initial state of the pages.
+	pages map[string]func(string) *page
+
+	// pages after they are created
+	userPages map[string]*page
 }
 
 func newApp() *app {
-	ret := app{page: *newPage()}
-	ret.owner = &ret.page
+
+	ret := app{pages: make(map[string]func(string) *page), userPages: make(map[string]*page)}
 	return &ret
 }
 
 func (a *app) run() {
 	http.HandleFunc("/", a.handler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
-
 }
 
 func (a *app) handler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[1:]
-	if len(path) == 0 {
+	pg, exists := a.pages[path]
+	if exists {
+		id := uuid.New().String()
+		page := pg(id)
+		page.owner = page
+		a.userPages[id] = page
+		// todo - cleanup user pages of the expired sessions
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(a.render()))
-	} else if path == "_refresh" {
+
+		expiration := time.Now().Add(365 * 24 * time.Hour)
+		cookie := http.Cookie{Name: "session", Value: id, Expires: expiration}
+		http.SetCookie(w, &cookie)
+
+		w.Write([]byte(page.render()))
+		return
+	}
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		w.Write([]byte("Invalid access"))
+		return
+	}
+	page := a.userPages[cookie.Value]
+
+	if path == "_refresh" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte(a.buffer))
-		print("Refresh called with: " + a.buffer + "\n")
-		a.buffer = ""
+		w.Write([]byte(page.buffer))
+		print("Refresh called with: " + page.buffer + "\n")
+		page.buffer = ""
 	} else if strings.HasPrefix(path, "convey/") {
 		arr := strings.Split(path, "/")
-		ctrl := *a.page.ids[arr[1]]
+		ctrl := *page.ids[arr[1]]
 		reqBody, _ := io.ReadAll(r.Body)
 		ctrl.getCallbacks()[arr[2]](string(reqBody))
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte(a.buffer))
-		print("Refresh called with: " + a.buffer + "\n")
-		a.buffer = ""
+		w.Write([]byte(page.buffer))
+		print("Refresh called with: " + page.buffer + "\n")
+		page.buffer = ""
 	} else {
 		w.WriteHeader(404)
 		fmt.Fprint(w, "Cannot find: "+path)
@@ -306,16 +350,26 @@ func (a *app) handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	app1 := newApp()
-	button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
-	button2 := NewButton("Button2", func(ss string) {
-		b := NewButton("Button 3", nil)
-		var cc control = b
-		app1.insertAt(&cc, 1)
-	})
 
-	var cc control = button1
-	app1.append(&cc)
-	cc = button2
-	app1.append(&cc)
+	app1.pages[""] = func(id string) *page {
+		p := newPage(id)
+		button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
+		button2 := NewButton("Button2", func(ss string) {
+			b := NewButton("Button 3", nil)
+			var cc control = b
+			p.insertAt(&cc, 1)
+		})
+		var cc control = button1
+		p.append(&cc)
+		cc = button2
+		p.append(&cc)
+
+		text := NewTextInput("text value", nil)
+		cc = text
+		p.append(&cc)
+
+		return p
+	}
+
 	app1.run()
 }
