@@ -74,11 +74,22 @@ func (h htmlControl) getAttributes() *map[string]string {
 	return &h.attributes
 }
 
-func (h *htmlControl) setAttr(name string, val string) {
+func (h *htmlControl) setAttr(name ...string) {
 	if h.attributes == nil {
 		h.attributes = make(map[string]string)
 	}
-	h.attributes[name] = val
+	if len(name) == 2 {
+		h.attributes[name[0]] = name[1]
+	} else {
+		delete(h.attributes, name[0])
+	}
+	if h.owner != nil {
+		if len(name) == 2 {
+			h.owner.buffer += fmt.Sprintf("setElementAttr('%s','%s','%s')", h.attributes["id"], name[0], name[1])
+		} else {
+			h.owner.buffer += fmt.Sprintf("removeElementAttr('%s','%s','%s')", h.attributes["id"], name[0])
+		}
+	}
 }
 
 func (h *htmlControl) mapEvent(ev string, event func(string)) {
@@ -200,6 +211,16 @@ func (p page) render() string {
 		p.insertBefore(x,b2)
 	}
 	controls[x.id] = x
+  }
+
+  function setElementAttr(id, attr, val) {
+	var e = document.getElementById(id)
+	e.setAttribute(attr,val)
+  }
+
+  function removeElementAttr(id, attr) {
+	var e = document.getElementById(id)
+	e.removeAttribute(attr)
   }
 
 
@@ -354,12 +375,28 @@ func main() {
 	app1.pages[""] = func(id string) *page {
 		p := newPage(id)
 		button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
+		button1_d := NewButton("Trigger button1", func(ss string) {
+			disabled := true
+			_, ok := (*button1.getAttributes())["disabled"]
+			if !ok {
+				disabled = false
+			}
+			disabled = !disabled
+			if disabled {
+				button1.setAttr("disabled", "1")
+			} else {
+				button1.setAttr("disabled")
+			}
+
+		})
 		button2 := NewButton("Button2", func(ss string) {
 			b := NewButton("Button 3", nil)
 			var cc control = b
 			p.insertAt(&cc, 1)
 		})
 		var cc control = button1
+		p.append(&cc)
+		cc = button1_d
 		p.append(&cc)
 		cc = button2
 		p.append(&cc)

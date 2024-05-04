@@ -73,11 +73,11 @@ func setArea(a *hasArea, val float64) {
 	}
 }
 
-type defective struct {
+type Defective struct {
 	Shape
 }
 
-func (this *defective) GetHeight() float64 {
+func (this *Defective) GetHeight() float64 {
 	fmt.Println("in defective.GetHeight")
 	return 7.0
 }
@@ -102,7 +102,7 @@ func main2() {
 
 	//	setArea(i, 100)
 
-	var d defective
+	var d Defective
 	d.GetHeight()
 
 	wh1 := WidthHeight{width: 10, height: 200}
