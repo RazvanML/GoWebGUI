@@ -19,16 +19,19 @@ type control interface {
 	getText() string
 	getAttributes() *map[string]string
 	getCallbacks() map[string]func(string)
+	append(n control)
+	insertAt(n control, pos int)
 }
 
 type htmlControl struct {
-	control
+	//	control
 	text       string
 	tag        string
 	attributes map[string]string
 	owner      *page
 	callbacks  map[string]func(string)
 	syncProps  []string
+	controls   []*control // child controls
 }
 
 var id_counter int = 0
@@ -55,7 +58,7 @@ func (h *htmlControl) setOwner(p *page) {
 	h.owner = p
 }
 
-func (h *htmlControl) event(ev string) {
+func (h htmlControl) event(ev string) {
 	if h.callbacks == nil {
 		return
 	}
@@ -99,46 +102,33 @@ func (h *htmlControl) mapEvent(ev string, event func(string)) {
 	h.callbacks[ev] = event
 }
 
-type composite interface {
-	append(n *control)
-	insertAt(n *control, pos int)
+func (c htmlControl) append(n control) {
+	c.controls = append(c.controls, &n)
+	n.setOwner(c.owner)
+	c.owner.addControl(&c, nil, n)
 }
 
-type compositeHtml struct {
-	//	composite
-	htmlControl
-	controls []*control
-}
-
-func (c *compositeHtml) append(n *control) {
-	c.controls = append(c.controls, n)
-	(*n).setOwner(c.owner)
-	var cc composite = c
-	c.owner.addControl(cc, nil, *n)
-}
-
-func (c *compositeHtml) insertAt(n *control, pos int) {
+func (c *htmlControl) insertAt(n control, pos int) {
 	if pos > len(c.controls) {
 		c.append(n)
 		return
 	} else {
 		c.controls = append(c.controls[:pos+1], c.controls[pos:]...)
-		c.controls[pos] = n
-		(*n).setOwner(c.owner)
-		var cc composite = c
-		c.owner.addControl(cc, c.controls[pos+1], *n)
+		c.controls[pos] = &n
+		n.setOwner(c.owner)
+		c.owner.addControl(c, *c.controls[pos+1], n)
 	}
 
 }
 
 type page struct {
-	compositeHtml
+	htmlControl
 	id     string
 	ids    map[string]*control
 	buffer string
 }
 
-func (p *page) addControl(parent composite, where *control, who control) {
+func (p *page) addControl(parent control, where control, who control) {
 	var parentCtrl control = parent.(control)
 
 	attrs, _ := json.Marshal(who.getAttributes())
@@ -151,7 +141,7 @@ func (p *page) addControl(parent composite, where *control, who control) {
 
 	wherestr := "null"
 	if where != nil {
-		wherestr = "'" + (*(*where).getAttributes())["id"] + "'"
+		wherestr = "'" + (*where.getAttributes())["id"] + "'"
 	}
 
 	p.buffer += fmt.Sprintf("addElement('%s',%s,'%s',%s,'%s',%s);\n",
@@ -280,10 +270,10 @@ type Button struct {
 	htmlControl
 }
 
-func NewButton(text string, onclick func(string)) *Button {
-	ret := &Button{htmlControl{text: text, tag: "Button"}}
-	if onclick != nil {
-		ret.mapEvent("click", onclick)
+func NewButton(text string, onClick func(string)) Button {
+	ret := Button{htmlControl{text: text, tag: "Button"}}
+	if onClick != nil {
+		ret.mapEvent("click", onClick)
 	}
 	return ret
 }
@@ -293,12 +283,12 @@ type TextInput struct {
 	val string
 }
 
-func NewTextInput(text string, onchange func(string)) *TextInput {
-	ret := &TextInput{htmlControl: htmlControl{text: "", tag: "input"}, val: text}
+func NewTextInput(text string, onChange func(string)) TextInput {
+	ret := TextInput{htmlControl: htmlControl{text: "", tag: "input"}, val: text}
 	ret.setAttr("type", "input")
 	(*ret.getAttributes())["type"] = "input"
-	if onchange != nil {
-		ret.mapEvent("change", onchange)
+	if onChange != nil {
+		ret.mapEvent("change", onChange)
 	}
 	return ret
 }
@@ -391,19 +381,14 @@ func main() {
 		})
 		button2 := NewButton("Button2", func(ss string) {
 			b := NewButton("Button 3", nil)
-			var cc control = b
-			p.insertAt(&cc, 1)
+			p.insertAt(&b, 1)
 		})
-		var cc control = button1
-		p.append(&cc)
-		cc = button1_d
-		p.append(&cc)
-		cc = button2
-		p.append(&cc)
+		p.append(&button1)
+		p.append(&button1_d)
+		p.append(&button2)
 
 		text := NewTextInput("text value", nil)
-		cc = text
-		p.append(&cc)
+		p.append(&text)
 
 		return p
 	}
