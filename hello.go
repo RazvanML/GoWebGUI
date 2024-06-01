@@ -21,6 +21,9 @@ type control interface {
 	getCallbacks() map[string]func(string)
 	append(n control)
 	insertAt(n control, pos int)
+	enable()
+	disable()
+	isEnabled()
 }
 
 type htmlControl struct {
@@ -35,6 +38,33 @@ type htmlControl struct {
 }
 
 var id_counter int = 0
+
+
+disabled := true
+_, ok := (*button1.getAttributes())["disabled"]
+if !ok {
+	disabled = false
+}
+disabled = !disabled
+if disabled {
+	button1.setAttr("disabled", "1")
+} else {
+	button1.setAttr("disabled")
+}
+
+
+func (h *htmlControl) enable() {
+
+}
+
+func (h *htmlControl) disable() {
+
+}
+
+func (h *htmlControl) isEnabled() {
+
+}
+
 
 func (h *htmlControl) getCallbacks() map[string]func(string) {
 	return h.callbacks
@@ -90,7 +120,7 @@ func (h *htmlControl) setAttr(name ...string) {
 		if len(name) == 2 {
 			h.owner.buffer += fmt.Sprintf("setElementAttr('%s','%s','%s')", h.attributes["id"], name[0], name[1])
 		} else {
-			h.owner.buffer += fmt.Sprintf("removeElementAttr('%s','%s','%s')", h.attributes["id"], name[0])
+			h.owner.buffer += fmt.Sprintf("removeElementAttr('%s','%s')", h.attributes["id"], name[0])
 		}
 	}
 }
@@ -366,6 +396,7 @@ func main() {
 		p := newPage(id)
 		button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
 		button1_d := NewButton("Trigger button1", func(ss string) {
+			
 			disabled := true
 			_, ok := (*button1.getAttributes())["disabled"]
 			if !ok {
