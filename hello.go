@@ -23,11 +23,11 @@ type control interface {
 	insertAt(n control, pos int)
 	enable()
 	disable()
-	isEnabled()
+	isEnabled() bool
 }
 
 type htmlControl struct {
-	//	control
+	control
 	text       string
 	tag        string
 	attributes map[string]string
@@ -39,32 +39,22 @@ type htmlControl struct {
 
 var id_counter int = 0
 
-
-disabled := true
-_, ok := (*button1.getAttributes())["disabled"]
-if !ok {
-	disabled = false
-}
-disabled = !disabled
-if disabled {
-	button1.setAttr("disabled", "1")
-} else {
-	button1.setAttr("disabled")
-}
-
-
 func (h *htmlControl) enable() {
-
+	h.setAttr("disabled")
 }
 
 func (h *htmlControl) disable() {
-
+	h.setAttr("disabled", "1")
 }
 
-func (h *htmlControl) isEnabled() {
-
+func (h *htmlControl) isEnabled() bool {
+	disabled := true
+	_, ok := (*h.getAttributes())["disabled"]
+	if !ok {
+		disabled = false
+	}
+	return !disabled
 }
-
 
 func (h *htmlControl) getCallbacks() map[string]func(string) {
 	return h.callbacks
@@ -396,19 +386,11 @@ func main() {
 		p := newPage(id)
 		button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
 		button1_d := NewButton("Trigger button1", func(ss string) {
-			
-			disabled := true
-			_, ok := (*button1.getAttributes())["disabled"]
-			if !ok {
-				disabled = false
-			}
-			disabled = !disabled
-			if disabled {
-				button1.setAttr("disabled", "1")
+			if button1.isEnabled() {
+				button1.disable()
 			} else {
-				button1.setAttr("disabled")
+				button1.enable()
 			}
-
 		})
 		button2 := NewButton("Button2", func(ss string) {
 			b := NewButton("Button 3", nil)
