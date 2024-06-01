@@ -7,8 +7,13 @@ import (
 )
 
 // interface
-type Shape interface {
+
+type hasArea interface {
 	Area() float64
+}
+
+type Shape interface {
+	hasArea
 	GetWidth() float64
 	GetHeight() float64
 	SetWidth(float64)
@@ -19,6 +24,7 @@ type Shape interface {
 // {
 
 type WidthHeight struct {
+	hasArea
 	width  float64
 	height float64
 }
@@ -37,14 +43,14 @@ func (this *WidthHeight) GetHeight() float64 {
 	return this.height
 }
 
+func (this *WidthHeight) Area() float64 {
+	return this.GetWidth() * this.GetHeight()
+}
+
 // }
 
 type Rectangle struct {
 	WidthHeight
-}
-
-func (this *Rectangle) Area() float64 {
-	return this.GetWidth() * this.GetHeight() / 2
 }
 
 // override
@@ -54,20 +60,30 @@ func (this *Rectangle) GetHeight() float64 {
 	return this.WidthHeight.GetHeight()
 }
 
-type hasArea interface {
-	Area() float64
+type Square struct {
+	Rectangle
+}
+
+func (this *Square) SetHeight(h float64) {
+	this.WidthHeight.height = h
+	this.WidthHeight.width = h
+}
+
+func (this *Square) SetWidth(h float64) {
+	this.WidthHeight.height = h
+	this.WidthHeight.width = h
 }
 
 func printArea(a hasArea) {
 	fmt.Println("Print area: ", a.Area())
 }
 
-func setArea(a *hasArea, val float64) {
-	r, ok := (*a).(*Rectangle)
+func setArea2(a hasArea, val float64) {
+	r, ok := a.(Shape)
 	if ok {
-		mult := math.Sqrt(val / r.Area())
-		r.height *= mult
-		r.width *= mult
+		m := math.Sqrt(val / a.Area())
+		r.SetHeight(m * r.GetHeight())
+		r.SetWidth(m * r.GetWidth())
 	} else {
 		panic("I don't know how to extend area for this shape.")
 	}
@@ -82,8 +98,53 @@ func (this *Defective) GetHeight() float64 {
 	return 7.0
 }
 
-func main2() {
-	var r Rectangle
+type Stringer interface {
+	String() string
+	setString(string)
+}
+
+type MyType struct {
+	value string
+}
+
+func (m MyType) String() string { return m.value }
+
+func (m MyType) setString(s string) {
+	m.value = s
+}
+
+func setStringer(s Stringer, val string) {
+	s.setString(val)
+}
+
+type IFace interface {
+	SetSomeField(newValue string)
+	GetSomeField() string
+}
+
+type Implementation struct {
+	someField string
+}
+
+func (i Implementation) GetSomeField() string {
+	return i.someField
+}
+
+func (i *Implementation) SetSomeField(newValue string) {
+	i.someField = newValue
+}
+
+func Create() *Implementation {
+	return &Implementation{someField: "Hello"}
+}
+
+func setField(i IFace, val string) {
+	i.SetSomeField(val)
+}
+
+func main1() {
+	var r Square
+	r.SetHeight(5)
 	var i Shape = &r
 	i.SetWidth(4)
 	i.SetHeight(6)
@@ -97,7 +158,8 @@ func main2() {
 	fmt.Println("cast: ", x.Area())
 	printArea(x)
 
-	setArea(&x, 1000)
+	//	setArea(&x, 1000)
+	setArea2(&r, 100)
 	fmt.Println("area: ", i.Area())
 
 	//	setArea(i, 100)
@@ -117,4 +179,18 @@ func main2() {
 
 	fmt.Println("rec1 height: ", rec1.height)
 
+	m1 := MyType{value: "something"}
+
+	setStringer(m1, "something else1")
+	fmt.Println("Value: ", m1.String())
+
+	var s1 Stringer
+	s1 = m1
+	s1.setString("something else2")
+	fmt.Println("Value: ", m1.String())
+
+	i1 := *Create()
+	fmt.Println("Field:", i1.someField)
+	setField(&i1, "test")
+	fmt.Println("Field:", i1.someField)
 }
