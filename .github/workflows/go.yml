@@ -39,8 +39,8 @@ jobs:
         run: go build -v  -o web ./...
       - run: ./../web &      
       - run: sleep 10
-      - run: 
-      - name: Set up JDK 11
+
+      - name: Set up JDK
         uses: actions/setup-java@v2
         with:
           java-version: '21'
