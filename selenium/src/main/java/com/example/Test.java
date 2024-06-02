@@ -1,13 +1,17 @@
 package com.example;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
+import java.io.File;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
 
 public class Test {
     public static void main(String[] args) {
@@ -30,7 +34,9 @@ public class Test {
 
             // Print the title of the page
             System.out.println("Title: " + driver.getTitle());
-
+            File scrFile = ((TakesScreenshot)driver).getScreenshotAs(OutputType.FILE);
+            
+            Files.move(scrFile.toPath(), new File("picture1.png").toPath());
             // Close the browser
             driver.quit();
         } catch (Exception e) {
