@@ -17,7 +17,7 @@ public class Test {
     public static void main(String[] args) {
         try {
             // Connect to the Selenium server running in Docker
-            URL url = new URI("http://localhost:4444/wd/hub").toURL();
+            URL url = new URI("http://selenium:4444/wd/hub").toURL();
 //            DesiredCapabilities capabilities = DesiredCapabilities.();
             WebDriver driver = new RemoteWebDriver(url, new ChromeOptions());
 
