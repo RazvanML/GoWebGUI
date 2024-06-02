@@ -22,7 +22,7 @@ public class Test {
             WebDriver driver = new RemoteWebDriver(url, new ChromeOptions());
 
             // Navigate to Google
-            driver.get("https://www.google.com");
+            driver.get("http://maincontainer:8080");
 
             // Find the search box and perform a search
             WebElement searchBox = driver.findElement(By.name("q"));

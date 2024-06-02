@@ -19,6 +19,7 @@ jobs:
 #        browser: ['chrome', 'firefox', 'edge']
     container:
       image: node:19
+      options: --network-alias maincontainer
 
     services:
       selenium:
