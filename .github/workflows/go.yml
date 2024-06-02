@@ -23,7 +23,7 @@ jobs:
 
     services:
       selenium:
-        image: selenium/standalone-firefox
+        image: selenium/standalone-chrome
         options: --shm-size=4gb
 
     steps:
