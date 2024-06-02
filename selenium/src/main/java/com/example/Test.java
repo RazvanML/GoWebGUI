@@ -42,6 +42,7 @@ public class Test {
             driver.quit();
         } catch (Exception e) {
             e.printStackTrace();
+            System.exit(1); // error state.
         }
     }
 }

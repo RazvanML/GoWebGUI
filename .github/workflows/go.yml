@@ -38,6 +38,8 @@ jobs:
   
       - name: Build
         run: go build -v  -o web -buildvcs=false ./...
+      - run: pwd
+      - run: ls ..
       - run: ./../web &      
       - run: sleep 1
 
