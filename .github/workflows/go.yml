@@ -37,7 +37,7 @@ jobs:
           go-version: '1.21.9'
   
       - name: Build
-        run: go build -v  -o web ./...
+        run: go build -v  -o web -buildvcs=false ./...
       - run: ./../web &      
       - run: sleep 10
 
