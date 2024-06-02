@@ -35,8 +35,9 @@ public class Test {
             // Print the title of the page
             System.out.println("Title: " + driver.getTitle());
             File scrFile = ((TakesScreenshot)driver).getScreenshotAs(OutputType.FILE);
-            
-            Files.move(scrFile.toPath(), new File("screenshots/picture1.png").toPath());
+            File f = new File("screenshots/picture1.png");
+            Files.move(scrFile.toPath(), f.toPath());
+            System.out.println("Wrote file: " + f.getAbsolutePath());
             // Close the browser
             driver.quit();
         } catch (Exception e) {

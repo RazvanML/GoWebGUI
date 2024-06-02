@@ -54,7 +54,8 @@ jobs:
       - name: Build with Maven
         run: |
           mkdir screenshots;
-          mvn -f selenium/pom.xml compile exec:java -Dexec.mainClass="com.example.Test"
+          mvn -f selenium/pom.xml compile exec:java -Dexec.mainClass="com.example.Test";
+          ls screenshots;
       - uses: actions/upload-artifact@v3
         if: always()
         with:
