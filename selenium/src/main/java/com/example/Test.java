@@ -14,6 +14,11 @@ import java.net.URL;
 import java.nio.file.Files;
 
 public class Test {
+
+    public static By byText(String text) {
+        return By.xpath ("//*[contains(text(),'"+text+"')]");
+    }
+
     public static void main(String[] args) {
         try {
             // Connect to the Selenium server running in Docker
@@ -25,15 +30,15 @@ public class Test {
             driver.get("http://maincontainer:8080");
 
             // Find the search box and perform a search
-            WebElement searchBox = driver.findElement(By.name("q"));
-            searchBox.sendKeys("Selenium Docker");
-            searchBox.submit();
+            WebElement bt = driver.findElement(byText("Button 2"));
+            if (!driver.findElements(byText("Button 3")).isEmpty()) {
+                throw new Exception("Button 3 already exists");
+            }
 
-            // Wait for the results to load
-            Thread.sleep(2000);
-
-            // Print the title of the page
-            System.out.println("Title: " + driver.getTitle());
+            bt.click();
+            WebElement bt1 = driver.findElement(byText("Button 3"));
+            bt1.click();
+            System.out.println("Passed!");
             File scrFile = ((TakesScreenshot)driver).getScreenshotAs(OutputType.FILE);
             File f = new File("screenshots/picture1.png");
             Files.move(scrFile.toPath(), f.toPath());
