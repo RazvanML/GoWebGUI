@@ -47,6 +47,10 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'maven'      
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: 3.8.2
       - name: Build with Maven
         run: mvn -f selenium/pom.xml compile exec:java -Dexec.mainClass="com.example.Test"
       - uses: actions/upload-artifact@v3
