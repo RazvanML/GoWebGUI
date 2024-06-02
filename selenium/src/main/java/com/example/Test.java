@@ -36,7 +36,7 @@ public class Test {
             System.out.println("Title: " + driver.getTitle());
             File scrFile = ((TakesScreenshot)driver).getScreenshotAs(OutputType.FILE);
             
-            Files.move(scrFile.toPath(), new File("picture1.png").toPath());
+            Files.move(scrFile.toPath(), new File("screenshots/picture1.png").toPath());
             // Close the browser
             driver.quit();
         } catch (Exception e) {

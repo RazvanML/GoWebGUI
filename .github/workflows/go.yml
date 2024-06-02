@@ -53,13 +53,11 @@ jobs:
           maven-version: 3.8.2
       - name: Build with Maven
         run: |
-          mkdir selenium/screenshots/;
-          pushd selenium/screenshots/;
+          mkdir screenshots;
           mvn -f selenium/pom.xml compile exec:java -Dexec.mainClass="com.example.Test"l
-          popd
       - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: screenshots
-          path: selenium/screenshots/
+          path: screenshots/
 
