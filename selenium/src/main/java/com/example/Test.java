@@ -52,7 +52,7 @@ public class Test {
             driver.get(test);
 
             // Find the search box and perform a search
-            WebElement bt = driver.findElement(byText("Button 2"));
+            WebElement bt = driver.findElement(byText("Button2"));
             if (!driver.findElements(byText("Button 3")).isEmpty()) {
                 throw new Exception("Button 3 already exists");
             }
@@ -68,7 +68,6 @@ public class Test {
             e.printStackTrace();
             if (driver != null) 
                 saveFile(driver, "screenshots/error.png");    
-            
             System.exit(1); // error state.
         }
     }
