@@ -39,7 +39,7 @@ public class Test {
         WebDriver driver = null;
         try {
             String selenium = "http://selenium:4444/wd/hub";
-            String test = "http://maincontainer:8080";
+            String test = "http://maincontainer:8080/page1";
             if (args.length > 0)
                 selenium = args[0];
             if (args.length > 1)
@@ -56,12 +56,11 @@ public class Test {
             if (!driver.findElements(byText("Button 3")).isEmpty()) {
                 throw new Exception("Button 3 already exists");
             }
-
             bt.click();
             WebElement bt1 = driver.findElement(byText("Button 3"));
             bt1.click();
             System.out.println("Passed!");
-            saveFile(driver, "screenshots/picture1.png");    
+            saveFile(driver, "screenshots/test1_completed.png");    
             driver.quit();
             driver = null;
         } catch (Exception e) {

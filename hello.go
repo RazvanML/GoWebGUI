@@ -380,9 +380,25 @@ func (a *app) handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	app1 := newApp()
+	app := newApp()
 
-	app1.pages[""] = func(id string) *page {
+	app.pages["page1"] = func(id string) *page {
+		p := newPage(id)
+		button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
+		button2 := NewButton("Button2", func(ss string) {
+			b := NewButton("Button 3", nil)
+			p.insertAt(&b, 1)
+		})
+		p.append(&button1)
+		p.append(&button2)
+
+		text := NewTextInput("text value", nil)
+		p.append(&text)
+
+		return p
+	}
+
+	app.pages["page2"] = func(id string) *page {
 		p := newPage(id)
 		button1 := NewButton("Button1", func(ss string) { print("Hello world 1\n" + ss) })
 		button1_d := NewButton("Trigger button1", func(ss string) {
@@ -392,19 +408,10 @@ func main() {
 				button1.enable()
 			}
 		})
-		button2 := NewButton("Button2", func(ss string) {
-			b := NewButton("Button 3", nil)
-			p.insertAt(&b, 1)
-		})
 		p.append(&button1)
 		p.append(&button1_d)
-		p.append(&button2)
-
-		text := NewTextInput("text value", nil)
-		p.append(&text)
-
 		return p
 	}
 
-	app1.run()
+	app.run()
 }
